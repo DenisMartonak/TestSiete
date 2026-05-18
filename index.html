@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sítový Test - Tréninkový Mód</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-tracker {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        .question-card {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+            border-left: 5px solid #3498db;
+            margin-bottom: 20px;
+        }
+        .question-text {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .answer-option {
+            display: block;
+            margin-bottom: 12px;
+            padding: 14px;
+            border-radius: 6px;
+            background: #fdfdfd;
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .answer-option:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+        .answer-option input {
+            margin-right: 12px;
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+        .actions-container {
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            flex: 1;
+            padding: 15px;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #submit-btn {
+            background: #3498db;
+        }
+        #submit-btn:hover {
+            background: #2980b9;
+        }
+        #next-btn {
+            background: #27ae60;
+        }
+        #next-btn:hover {
+            background: #2ecc71;
+        }
+        .hidden {
+            display: none !important;
+        }
+        /* Feedback Grading Colors */
+        .correct-option {
+            background-color: #d4edda !important;
+            border-color: #c3e6cb !important;
+            color: #155724;
+            font-weight: 500;
+        }
+        .wrong-option {
+            background-color: #f8d7da !important;
+            border-color: #f5c6cb !important;
+            color: #721c24;
+        }
+        #final-score-card {
+            background: #fff;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+        }
+        .score-display {
+            font-size: 3em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Sítový Test</h1>
+    <div id="progress" class="progress-tracker">Načítání otázek...</div>
+
+    <div id="quiz-container">
+        </div>
+
+    <div class="actions-container">
+        <button id="submit-btn" onclick="submitMultiAnswer()">Potvrdit odpověď</button>
+        <button id="next-btn" class="hidden" onclick="nextQuestion()">Další otázka</button>
+    </div>
+
+    <script src="questions.js"></script>
+    <script>
+        let shuffledQuestions = [];
+        let currentQuestionIndex = 0;
+        let correctQuestionsCount = 0;
+
+        // Fisher-Yates Shuffle Algorithm
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Initialize quiz
+        function initQuiz() {
+            if (typeof quizData === 'undefined' || quizData.length === 0) {
+                document.getElementById('progress').innerText = "Chyba: Soubor 'questions.js' chybí nebo je prázdný.";
+                return;
+            }
+            shuffledQuestions = shuffleArray([...quizData]);
+            currentQuestionIndex = 0;
+            correctQuestionsCount = 0;
+            showQuestion();
+        }
+
+        // Render the current active question
+        function showQuestion() {
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = ''; // Reset container view
+
+            // Update UI trackers
+            document.getElementById('progress').innerText = `Otázka ${currentQuestionIndex + 1} z ${shuffledQuestions.length}`;
+            document.getElementById('next-btn').classList.add('hidden');
+
+            const qData = shuffledQuestions[currentQuestionIndex];
+
+            // Build structural elements
+            const card = document.createElement('div');
+            card.className = 'question-card';
+
+            const qText = document.createElement('div');
+            qText.className = 'question-text';
+            qText.innerText = qData.question;
+            card.appendChild(qText);
+
+            // Zjistíme, kolik správných odpovědí má tato otázka
+            const correctCount = qData.answers.filter(ans => ans.correct).length;
+            const isSingleChoice = (correctCount === 1);
+
+            // Skryjeme submit button, pokud se jedná o single choice (vyhodnotí se hned po kliknutí)
+            if (isSingleChoice) {
+                document.getElementById('submit-btn').classList.add('hidden');
+            } else {
+                document.getElementById('submit-btn').classList.remove('hidden');
+            }
+
+            // Shuffle choices inside this question
+            const shuffledAnswers = shuffleArray([...qData.answers]);
+
+            shuffledAnswers.forEach((ans) => {
+                if (isSingleChoice) {
+                    // Single choice -> jen jako samostatný klikatelný button (div)
+                    const btn = document.createElement('div');
+                    btn.className = 'answer-option';
+                    btn.innerText = ans.text;
+                    btn.dataset.isCorrect = ans.correct;
+                    
+                    // Po kliknutí se hned vyhodnotí
+                    btn.onclick = function() { submitSingleAnswer(this); };
+                    card.appendChild(btn);
+                } else {
+                    // Multiple choice -> klasické checkboxy s textem
+                    const label = document.createElement('label');
+                    label.className = 'answer-option';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'quiz-options';
+                    checkbox.dataset.isCorrect = ans.correct;
+
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(ans.text));
+                    card.appendChild(label);
+                }
+            });
+
+            container.appendChild(card);
+        }
+
+        // 1. Okamžité vyhodnocení pro SINGLE CHOICE otázky (barevné buttony)
+        function submitSingleAnswer(clickedOption) {
+            const card = document.querySelector('.question-card');
+            const options = card.querySelectorAll('.answer-option');
+            const isUserCorrect = (clickedOption.dataset.isCorrect === 'true');
+
+            options.forEach(opt => {
+                const isCorrectOption = (opt.dataset.isCorrect === 'true');
+
+                if (isCorrectOption) {
+                    opt.classList.add('correct-option'); // Zelená pro správnou odpověď
+                }
+                if (opt === clickedOption && !isCorrectOption) {
+                    opt.classList.add('wrong-option'); // Červená, pokud uživatel klikl na nesprávnou
+                }
+
+                // Deaktivujeme možnost klikat na ostatní odpovědi
+                opt.style.pointerEvents = 'none';
+            });
+
+            if (isUserCorrect) {
+                correctQuestionsCount++;
+            } else {
+                card.style.borderLeftColor = '#e74c3c'; // Červený okraj karty při chybě
+            }
+
+            revealNextButton();
+        }
+
+        // 2. Vyhodnocení pro MULTIPLE CHOICE otázky (přes potvrzovací tlačítko)
+        function submitMultiAnswer() {
+            const checkboxes = document.querySelectorAll('input[name="quiz-options"]');
+            let isEverythingCorrect = true;
+            let checkedCount = 0;
+
+            checkboxes.forEach(cb => {
+                const label = cb.parentElement;
+                const isCorrectOption = (cb.dataset.isCorrect === 'true');
+                const isUserChecked = cb.checked;
+
+                if (isUserChecked) checkedCount++;
+
+                if (isCorrectOption) {
+                    label.classList.add('correct-option');
+                }
+                if (isUserChecked && !isCorrectOption) {
+                    label.classList.add('wrong-option');
+                }
+
+                if (isUserChecked !== isCorrectOption) {
+                    isEverythingCorrect = false;
+                }
+
+                cb.disabled = true;
+            });
+
+            if (checkedCount === 0) isEverythingCorrect = false;
+
+            if (isEverythingCorrect) {
+                correctQuestionsCount++;
+            } else {
+                document.querySelector('.question-card').style.borderLeftColor = '#e74c3c';
+            }
+
+            document.getElementById('submit-btn').classList.add('hidden');
+            revealNextButton();
+        }
+
+        // Společná funkce pro zobrazení tlačítka "Další otázka"
+        function revealNextButton() {
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.classList.remove('hidden');
+            
+            if (currentQuestionIndex === shuffledQuestions.length - 1) {
+                nextBtn.innerText = "Zobrazit celkové výsledky";
+            }
+        }
+
+        // Přechod na další otázku
+        function nextQuestion() {
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < shuffledQuestions.length) {
+                showQuestion();
+            } else {
+                showFinalResults();
+            }
+        }
+
+        // Zobrazení závěrečné statistiky
+        function showFinalResults() {
+            document.getElementById('progress').classList.add('hidden');
+            document.getElementById('submit-btn').classList.add('hidden');
+            document.getElementById('next-btn').classList.add('hidden');
+
+            const pct = Math.round((correctQuestionsCount / shuffledQuestions.length) * 100);
+
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = `
+                <div id="final-score-card">
+                    <h2>Test je dokončen!</h2>
+                    <p>Tvůj konečný výsledek činí:</p>
+                    <div class="score-display">${correctQuestionsCount} / ${shuffledQuestions.length}</div>
+                    <p>Úspěšnost: <strong>${pct}%</strong></p>
+                    <button id="submit-btn" style="margin-top:20px;" onclick="location.reload()">Spustit nový test</button>
+                </div>
+            `;
+        }
+
+        window.onload = initQuiz;
+    </script>
+</body>
+</html>
