@@ -8453,8 +8453,12 @@ const quizData = [
         "question": "VLAN je označení pro:",
         "answers": [
             {
-                "text": "Bezdrátovou lokální počítačovou síť + Virtuální lokální počítačovou síť",
+                "text": "Bezdrátovou lokální počítačovou síť",
                 "correct": false
+            },
+            {
+                "text": "Virtuální lokální počítačovou síť",
+                "correct": true
             },
             {
                 "text": "Virtuální privátní síť",
